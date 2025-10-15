@@ -2,7 +2,7 @@
 
 client_id = "f7a849c648327b42c87bb6cae77458db"
 name = "Dista Sync App"
-application_url = "https://dista-sync-app.onrender.com"
+application_url = "https://dista-sync-app.onrender.com/app"
 embedded = true
 
 [build]
