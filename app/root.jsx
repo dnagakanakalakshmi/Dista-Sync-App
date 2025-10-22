@@ -20,6 +20,7 @@ export default function App() {
     <html>
       <head>
         <meta charSet="utf-8" />
+        <meta name="shopify-debug" content="web-vitals" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
         <link rel="preconnect" href="https://cdn.shopify.com/" />
         <link
