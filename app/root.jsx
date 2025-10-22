@@ -5,8 +5,17 @@ import {
   Scripts,
   ScrollRestoration,
 } from "@remix-run/react";
+import { useEffect } from "react";
 
 export default function App() {
+  useEffect(() => {
+    function processWebVitals(metrics) {
+      const monitorUrl = 'https://dista-sync-app.onrender.com/monitor-web-vitals';
+      const data = JSON.stringify(metrics);
+      navigator.sendBeacon(monitorUrl, data);
+    }
+    shopify.webVitals.onReport(processWebVitals);
+  }, []);
   return (
     <html>
       <head>
