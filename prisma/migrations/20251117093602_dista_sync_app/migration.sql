@@ -1,0 +1,45 @@
+-- CreateTable
+CREATE TABLE "Session" (
+    "id" TEXT NOT NULL,
+    "shop" TEXT NOT NULL,
+    "state" TEXT NOT NULL,
+    "isOnline" BOOLEAN NOT NULL DEFAULT false,
+    "scope" TEXT,
+    "expires" TIMESTAMP(3),
+    "accessToken" TEXT NOT NULL,
+    "userId" BIGINT,
+    "firstName" TEXT,
+    "lastName" TEXT,
+    "email" TEXT,
+    "accountOwner" BOOLEAN NOT NULL DEFAULT false,
+    "locale" TEXT,
+    "collaborator" BOOLEAN DEFAULT false,
+    "emailVerified" BOOLEAN DEFAULT false,
+
+    CONSTRAINT "Session_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Onboarding" (
+    "id" TEXT NOT NULL,
+    "shop" TEXT,
+    "adminEmail" TEXT NOT NULL,
+    "completed" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Onboarding_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "Emails" (
+    "id" TEXT NOT NULL,
+    "emails" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "Emails_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Emails_emails_key" ON "Emails"("emails");
