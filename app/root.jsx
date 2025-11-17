@@ -6,7 +6,6 @@ import {
   ScrollRestoration,
 } from "@remix-run/react";
 import { useEffect } from "react";
-import shopify from "./shopify.server";
 
 export default function App() {
   useEffect(() => {
