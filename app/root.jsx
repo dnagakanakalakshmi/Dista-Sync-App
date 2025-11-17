@@ -14,7 +14,7 @@ export default function App() {
       const data = JSON.stringify(metrics);
       navigator.sendBeacon(monitorUrl, data);
     }
-    shopify.webVitals.onReport(processWebVitals);
+    // shopify.webVitals.onReport(processWebVitals);
   }, []);
   return (
     <html>
