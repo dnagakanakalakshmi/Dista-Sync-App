@@ -9,19 +9,20 @@ generator client {
 // enough when changing adapters.
 // See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "mongodb"
+  url      = env("MONGODB_URI")
 }
 
 model Session {
-  id            String    @id
+  session_id    String    @id @default(auto()) @map("_id") @db.ObjectId
+  id            String    @unique
   shop          String
   state         String
   isOnline      Boolean   @default(false)
   scope         String?
   expires       DateTime?
   accessToken   String
-  userId        BigInt?
+  userId        String?     
   firstName     String?
   lastName      String?
   email         String?
@@ -32,7 +33,7 @@ model Session {
 }
 
 model Onboarding {
-  id         String   @id @default(cuid())
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
   shop       String?
   adminEmail String
   completed  Boolean  @default(false)
@@ -41,7 +42,7 @@ model Onboarding {
 }
 
 model Emails {
-  id        String   @id @default(cuid())
+  id       String   @id @default(auto()) @map("_id") @db.ObjectId
   emails    String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
