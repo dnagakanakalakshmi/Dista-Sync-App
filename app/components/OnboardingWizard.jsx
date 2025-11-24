@@ -1,6 +1,20 @@
-import React, { useState, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 // Support both CJS default export and named exports depending on bundler
 import { Page, Card, Button, TextField, Checkbox, Text, Badge, BlockStack, InlineStack } from "@shopify/polaris";
+
+const PERMISSIONS = [
+  { title: "Products", desc: "View and manage products" },
+  { title: "Customers", desc: "View and manage customers" },
+  { title: "Orders", desc: "View and manage orders" },
+  { title: "Draft orders", desc: "View and manage draft orders" },
+  { title: "Inventory", desc: "View and manage inventory levels" },
+  { title: "Fulfillments", desc: "View and manage fulfillments" },
+  { title: "Locations", desc: "View and manage locations" },
+  { title: "Shipping", desc: "View and manage shipping settings" },
+  { title: "Discounts & Price rules", desc: "View and manage discounts and price rules" },
+];
+
+const normalizeEmail = (value = "") => value.trim().toLowerCase();
 
 export default function OnboardingWizard({ initialEmail = "", shop = null, partnerEmails = [] }) {
   const [step, setStep] = useState(1);
@@ -9,17 +23,10 @@ export default function OnboardingWizard({ initialEmail = "", shop = null, partn
   const [accepted, setAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const permissions = [
-    { title: "Products", items: ["read_products", "write_products"], desc: "View and manage products" },
-    { title: "Customers", items: ["read_customers", "write_customers"], desc: "View and manage customers" },
-    { title: "Orders", items: ["read_orders", "write_orders"], desc: "View and manage orders" },
-    { title: "Draft orders", items: ["read_draft_orders", "write_draft_orders"], desc: "View and manage draft orders" },
-    { title: "Inventory", items: ["read_inventory", "write_inventory"], desc: "View and manage inventory levels" },
-    { title: "Fulfillments", items: ["read_fulfillments", "write_fulfillments"], desc: "View and manage fulfillments" },
-    { title: "Locations", items: ["read_locations", "write_locations"], desc: "View and manage locations" },
-    { title: "Shipping", items: ["read_shipping", "write_shipping"], desc: "View and manage shipping settings" },
-    { title: "Discounts & Price rules", items: ["read_discounts", "write_discounts", "read_price_rules", "write_price_rules"], desc: "View and manage discounts and price rules" },
-  ];
+  const normalizedPartnerEmails = useMemo(() => {
+    if (!Array.isArray(partnerEmails)) return [];
+    return partnerEmails.map((entry) => normalizeEmail(entry)).filter(Boolean);
+  }, [partnerEmails]);
 
 
   function validateEmail(value) {
@@ -40,11 +47,11 @@ export default function OnboardingWizard({ initialEmail = "", shop = null, partn
 
     // Validate email against partnerEmails (provided by loader). If valid, save admin email to server and advance.
     try {
-      const normalized = (email || "").trim().toLowerCase();
-      const allowed = Array.isArray(partnerEmails) && partnerEmails.includes(normalized);
+      const normalized = normalizeEmail(email || "");
+      const allowed = normalizedPartnerEmails.includes(normalized);
       if (!allowed) {
         setEmailError("This email is not registered with Dista-WMS. If you're not registered, please email it@distacart.com");
-        console.log("handleNextFromEmail: email not in partner list", { email: normalized, partnerEmails });
+        console.log("handleNextFromEmail: email not in partner list", { email: normalized, partnerEmails: normalizedPartnerEmails });
         return;
       }
     } catch (e) {
@@ -158,7 +165,7 @@ export default function OnboardingWizard({ initialEmail = "", shop = null, partn
               <Text as="p">Dista-WMS requires the following permissions to synchronize your store.</Text>
               <Card sectioned>
                 <BlockStack gap="200">
-                  {permissions.map((g) => (
+                  {PERMISSIONS.map((g) => (
                     <div key={g.title} style={{ marginBottom: 12 }}>
                       <Text as="h4" style={{ fontWeight: 600 }}>{g.title}</Text>
                       <Text as="p" color="subdued">{g.desc}</Text>

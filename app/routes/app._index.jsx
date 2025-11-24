@@ -3,45 +3,35 @@ import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
 import OnboardingWizard from "../components/OnboardingWizard";
 import { TitleBar } from "@shopify/app-bridge-react";
-import { PrismaClient } from "@prisma/client";
+import prisma from "../db.server";
 import shopify from "../shopify.server";
 
-const prisma = new PrismaClient();
+const normalizeEmail = (value = "") => value.trim().toLowerCase();
 
-// Helper to load and normalize partner emails from the `Emails` table.
 async function getPartnerEmails() {
   const rows = await prisma.emails.findMany({ select: { emails: true } });
-  const collected = [];
-  for (const r of rows) {
-    const raw = ((r.emails) || "").toString().trim();
-    if (!raw) continue;
-    // parse JSON array string first
-    if (raw.startsWith("[") && raw.endsWith("]")) {
-      try {
-        const arr = JSON.parse(raw);
-        if (Array.isArray(arr)) {
-          for (const item of arr) {
-            if (typeof item === "string" && item.trim()) collected.push(item.trim().toLowerCase());
-          }
-          continue;
-        }
-      } catch (e) {
-        // fall back to CSV parsing below
-        console.warn("getPartnerEmails: failed to parse JSON", raw, e);
-      }
-    }
-    const parts = raw.includes(",") ? raw.split(",").map((s) => s.trim()).filter(Boolean) : [raw.trim()];
-    for (const p of parts) collected.push(p.toLowerCase());
-  }
-  return Array.from(new Set(collected));
+  return Array.from(
+    new Set(
+      rows
+        .map((row) => normalizeEmail(row.emails || ""))
+        .filter(Boolean),
+    ),
+  );
 }
 
 export async function action({ request }) {
   try {
-    const body = await request.json();
+    const { session } = await shopify.authenticate.admin(request);
+    const shop = session?.shop || null;
+
+    let body = {};
+    try {
+      body = await request.json();
+    } catch {
+      // Ignore parse errors; validation below will handle missing fields
+    }
+
     const { email, completed } = body || {};
-    const url = new URL(request.url);
-    const shop = body?.shop || url.searchParams.get("shop") || null;
 
     if (!email && !completed && !shop) {
       return json({ ok: false, error: "email or completed or shop required" }, { status: 400 });
@@ -54,7 +44,14 @@ export async function action({ request }) {
         const normalized = (email || "").trim().toLowerCase();
         if (!partnerEmails.includes(normalized)) {
           console.log("/app action: email not registered", { email: normalized });
-          return json({ ok: false, error: "email_not_registered", message: "This email is not registered with Dista-WMS. If you're not registered, please email it@distacart.com" }, { status: 400 });
+          return json(
+            {
+              ok: false,
+              error: "email_not_registered",
+              message: "This email is not registered with Dista-WMS. If you're not registered, please email it@distacart.com",
+            },
+            { status: 400 },
+          );
         }
       } catch (e) {
         console.error("/app action: email verification failed", e);
@@ -65,7 +62,10 @@ export async function action({ request }) {
     if (shop) {
       const existing = await prisma.onboarding.findFirst({ where: { shop } });
       if (existing) {
-        const updated = await prisma.onboarding.update({ where: { id: existing.id }, data: { completed: !!completed, adminEmail: email || existing.adminEmail, shop } });
+        const updated = await prisma.onboarding.update({
+          where: { id: existing.id },
+          data: { completed: !!completed, adminEmail: email || existing.adminEmail, shop },
+        });
         return json({ ok: true, record: updated });
       }
       const created = await prisma.onboarding.create({ data: { adminEmail: email || "", completed: !!completed, shop } });
@@ -74,10 +74,15 @@ export async function action({ request }) {
 
     const existing = await prisma.onboarding.findFirst({ where: { adminEmail: email } });
     if (existing) {
-      const updated = await prisma.onboarding.update({ where: { id: existing.id }, data: { completed: !!completed, adminEmail: email } });
+      const updated = await prisma.onboarding.update({
+        where: { id: existing.id },
+        data: { completed: !!completed, adminEmail: email },
+      });
       return json({ ok: true, record: updated });
     }
-    const created = await prisma.onboarding.create({ data: { adminEmail: email || "", completed: !!completed } });
+    const created = await prisma.onboarding.create({
+      data: { adminEmail: email || "", completed: !!completed },
+    });
     return json({ ok: true, record: created });
   } catch (e) {
     console.error(e);
@@ -88,7 +93,7 @@ export async function action({ request }) {
 export async function loader({ request }) {
   try {
     const { session } = await shopify.authenticate.admin(request);
-    const { shop } = session;
+    const { shop } = session; 
     if (shop) {
       const rec = await prisma.onboarding.findFirst({ where: { shop } });
       const partnerEmails = await getPartnerEmails();
