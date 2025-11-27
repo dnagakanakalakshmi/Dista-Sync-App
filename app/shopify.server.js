@@ -5,7 +5,11 @@ import {
   shopifyApp,
 } from "@shopify/shopify-app-remix/server";
 import { PrismaSessionStorage } from "@shopify/shopify-app-session-storage-prisma";
+// Load secrets before initializing Shopify app
+import { loadSecrets } from "./config/secrets-loader.server";
 import prisma from "./db.server";
+// Load secrets before initializing Shopify app
+await loadSecrets();
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
