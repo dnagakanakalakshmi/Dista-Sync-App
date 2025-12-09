@@ -9,11 +9,11 @@ import shopify from "../shopify.server";
 const normalizeEmail = (value = "") => value.trim().toLowerCase();
 
 async function getPartnerEmails() {
-  const rows = await prisma.emails.findMany({ select: { emails: true } });
+  const rows = await prisma.users.findMany({ select: { email: true } });
   return Array.from(
     new Set(
       rows
-        .map((row) => normalizeEmail(row.emails || ""))
+        .map((row) => normalizeEmail(row.email || ""))
         .filter(Boolean),
     ),
   );
@@ -37,13 +37,19 @@ export async function action({ request }) {
       return json({ ok: false, error: "email or completed or shop required" }, { status: 400 });
     }
 
-    // Server-side verification: if an email is present, ensure it exists in `Emails` table
-    if (email) {
+    // Server-side verification: if an email is present, ensure it exists in `Users` table with matching store
+    if (email && shop) {
       try {
-        const partnerEmails = await getPartnerEmails();
         const normalized = (email || "").trim().toLowerCase();
-        if (!partnerEmails.includes(normalized)) {
-          console.log("/app action: email not registered", { email: normalized });
+        const user = await prisma.users.findFirst({
+          where: {
+            email: normalized,
+            store: shop
+          }
+        });
+        
+        if (!user) {
+          console.log("/app action: email-store combination not found", { email: normalized, shop });
           return json(
             {
               ok: false,
