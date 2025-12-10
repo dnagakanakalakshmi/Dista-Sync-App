@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 // Support both CJS default export and named exports depending on bundler
 import { Page, Card, Button, TextField, Checkbox, Text, Badge, BlockStack, InlineStack } from "@shopify/polaris";
 
