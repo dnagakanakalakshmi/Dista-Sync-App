@@ -50,7 +50,7 @@ export default function OnboardingWizard({ initialEmail = "", shop = null, partn
       const normalized = normalizeEmail(email || "");
       const allowed = normalizedPartnerEmails.includes(normalized);
       if (!allowed) {
-        setEmailError("This email is not registered with Dista-WMS. If you're not registered, please email it@distacart.com");
+        setEmailError("This email is not registered with Dista-WMS.");
         console.log("handleNextFromEmail: email not in partner list", { email: normalized, partnerEmails: normalizedPartnerEmails });
         return;
       }
@@ -150,7 +150,7 @@ export default function OnboardingWizard({ initialEmail = "", shop = null, partn
                 error={emailError || undefined}
               />
               <Text as="p" variant="bodySm" color="subdued">
-                If your email is not registered with Dista-WMS, please send a message to <strong>it@distacart.com</strong> and our team will assist you.
+                If your email is not registered with Dista-WMS, please register <a href="https://dista-sync-client.onrender.com/" target="_blank" rel="noreferrer noopener">here</a>.
               </Text>
               <InlineStack gap="200" style={{ width: '100%', justifyContent: 'flex-end' }}>
                 <Button primary onClick={handleNextFromEmail} loading={loading}>

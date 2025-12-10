@@ -55,7 +55,7 @@ export async function action({ request }) {
             {
               ok: false,
               error: "email_not_registered",
-              message: "This email is not registered with Dista-WMS. If you're not registered, please email it@distacart.com",
+              message: "This email is not registered with Dista-WMS.",
             },
             { status: 400 },
           );
