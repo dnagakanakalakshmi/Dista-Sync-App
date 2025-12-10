@@ -8,8 +8,9 @@ import shopify from "../shopify.server";
 
 const normalizeEmail = (value = "") => value.trim().toLowerCase();
 
-async function getPartnerEmails() {
-  const rows = await prisma.users.findMany({ select: { email: true } });
+async function getPartnerEmails(shop = null) {
+  const where = shop ? { store: shop } : {};
+  const rows = await prisma.users.findMany({ where, select: { email: true } });
   return Array.from(
     new Set(
       rows
@@ -102,7 +103,7 @@ export async function loader({ request }) {
     const { shop } = session; 
     if (shop) {
       const rec = await prisma.onboarding.findFirst({ where: { shop } });
-      const partnerEmails = await getPartnerEmails();
+      const partnerEmails = await getPartnerEmails(shop);
       return json({ completed: !!(rec && rec.completed), record: rec || null, shop, partnerEmails });
     }
     const rec = await prisma.onboarding.findFirst({ where: { completed: true } });
