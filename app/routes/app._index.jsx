@@ -8,9 +8,8 @@ import shopify from "../shopify.server";
 
 const normalizeEmail = (value = "") => value.trim().toLowerCase();
 
-async function getPartnerEmails(shop = null) {
-  const where = shop ? { store: shop } : {};
-  const rows = await prisma.users.findMany({ where, select: { email: true } });
+async function getPartnerEmails() {
+  const rows = await prisma.users.findMany({ select: { email: true } });
   return Array.from(
     new Set(
       rows
@@ -38,27 +37,48 @@ export async function action({ request }) {
       return json({ ok: false, error: "email or completed or shop required" }, { status: 400 });
     }
 
-    // Server-side verification: if an email is present, ensure it exists in `Users` table with matching store
-    if (email && shop) {
+    // Server-side verification: if an email is present, ensure it exists in `Users` table
+    if (email) {
       try {
         const normalized = (email || "").trim().toLowerCase();
-        const user = await prisma.users.findFirst({
+        const user = await prisma.users.findUnique({
           where: {
-            email: normalized,
-            store: shop
+            email: normalized
           }
         });
         
         if (!user) {
-          console.log("/app action: email-store combination not found", { email: normalized, shop });
+          console.log("/app action: email not found in Users table", { email: normalized });
           return json(
             {
               ok: false,
               error: "email_not_registered",
-              message: "This email is not registered with Dista-WMS.",
+              message: "This email is not registered with Dista-WMS. Please register at https://dista-sync-client.onrender.com/",
             },
             { status: 400 },
           );
+        }
+
+        // User exists - add shop to stores array if not already present
+        if (shop) {
+          let storesArray = [];
+          try {
+            storesArray = JSON.parse(user.stores || "[]");
+          } catch (e) {
+            console.error("/app action: failed to parse stores", e);
+            storesArray = [];
+          }
+          
+          if (!storesArray.includes(shop)) {
+            storesArray.push(shop);
+            await prisma.users.update({
+              where: { email: normalized },
+              data: { 
+                stores: JSON.stringify(storesArray)
+              }
+            });
+            console.log("/app action: added shop to user's stores", { email: normalized, shop });
+          }
         }
       } catch (e) {
         console.error("/app action: email verification failed", e);
@@ -103,7 +123,7 @@ export async function loader({ request }) {
     const { shop } = session; 
     if (shop) {
       const rec = await prisma.onboarding.findFirst({ where: { shop } });
-      const partnerEmails = await getPartnerEmails(shop);
+      const partnerEmails = await getPartnerEmails();
       return json({ completed: !!(rec && rec.completed), record: rec || null, shop, partnerEmails });
     }
     const rec = await prisma.onboarding.findFirst({ where: { completed: true } });
