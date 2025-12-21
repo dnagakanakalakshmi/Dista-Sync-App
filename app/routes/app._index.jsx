@@ -38,17 +38,19 @@ export async function action({ request }) {
     }
 
     // Server-side verification: if an email is present, ensure it exists in `Users` table
+    let normalizedEmail = null;
+
     if (email) {
       try {
-        const normalized = (email || "").trim().toLowerCase();
+        normalizedEmail = (email || "").trim().toLowerCase();
         const user = await prisma.users.findUnique({
           where: {
-            email: normalized
+            email: normalizedEmail
           }
         });
         
         if (!user) {
-          console.log("/app action: email not found in Users table", { email: normalized });
+          console.log("/app action: email not found in Users table", { email: normalizedEmail });
           return json(
             {
               ok: false,
@@ -58,31 +60,34 @@ export async function action({ request }) {
             { status: 400 },
           );
         }
-
-        // User exists - add shop to stores array if not already present
-        if (shop) {
-          let storesArray = [];
-          try {
-            storesArray = JSON.parse(user.stores || "[]");
-          } catch (e) {
-            console.error("/app action: failed to parse stores", e);
-            storesArray = [];
-          }
-          
-          if (!storesArray.includes(shop)) {
-            storesArray.push(shop);
-            await prisma.users.update({
-              where: { email: normalized },
-              data: { 
-                stores: JSON.stringify(storesArray)
-              }
-            });
-            console.log("/app action: added shop to user's stores", { email: normalized, shop });
-          }
-        }
       } catch (e) {
         console.error("/app action: email verification failed", e);
         return json({ ok: false, error: "email_verification_failed" }, { status: 500 });
+      }
+    }
+
+    // Append store only after the onboarding is marked completed (step 2)
+    if (completed && shop && normalizedEmail) {
+      const user = await prisma.users.findUnique({ where: { email: normalizedEmail } });
+      if (user) {
+        let storesArray = [];
+        try {
+          storesArray = JSON.parse(user.stores || "[]");
+        } catch (e) {
+          console.error("/app action: failed to parse stores", e);
+          storesArray = [];
+        }
+
+        if (!storesArray.includes(shop)) {
+          storesArray.push(shop);
+          await prisma.users.update({
+            where: { email: normalizedEmail },
+            data: {
+              stores: JSON.stringify(storesArray),
+            },
+          });
+          console.log("/app action: added shop to user's stores", { email: normalizedEmail, shop });
+        }
       }
     }
 
