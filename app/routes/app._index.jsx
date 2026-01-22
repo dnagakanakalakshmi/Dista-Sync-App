@@ -1,191 +1,97 @@
-import { Page, Text, Card, BlockStack, InlineStack } from "@shopify/polaris";
 import { json } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
+import { useState } from "react";
 import OnboardingWizard from "../components/OnboardingWizard";
-import { TitleBar } from "@shopify/app-bridge-react";
+import { ExternalSiteFrame } from "../components/ExternalSiteFrame";
 import prisma from "../db.server";
-import shopify from "../shopify.server";
+import { authenticate } from "../shopify.server";
 
-const normalizeEmail = (value = "") => value.trim().toLowerCase();
-
-async function getPartnerEmails() {
-  const rows = await prisma.users.findMany({ select: { email: true } });
-  return Array.from(
-    new Set(
-      rows
-        .map((row) => normalizeEmail(row.email || ""))
-        .filter(Boolean),
-    ),
-  );
-}
-
-export async function action({ request }) {
+const buildExternalUrl = (shop, email = "") => {
+  const base = process.env.EXTERNAL_SITE_URL || "https://dista-sync-client.onrender.com";
   try {
-    const { session } = await shopify.authenticate.admin(request);
-    const shop = session?.shop || null;
+    const url = new URL(base);
+    if (shop) url.searchParams.set("shop", shop);
+    if (email) url.searchParams.set("email", email);
+    url.searchParams.set("source", "embedded_app");
+    return url.toString();
+  } catch (e) {
+    // Fallback to the raw base if it is not a valid URL
+    return base;
+  }
+};
 
-    let body = {};
-    try {
-      body = await request.json();
-    } catch {
-      // Ignore parse errors; validation below will handle missing fields
-    }
+export const loader = async ({ request }) => {
+  const { session } = await authenticate.admin(request);
+  const shop = session.shop;
 
-    const { email, completed } = body || {};
+  const existing = await prisma.onboarding.findFirst({ where: { shop } });
 
-    if (!email && !completed && !shop) {
-      return json({ ok: false, error: "email or completed or shop required" }, { status: 400 });
-    }
+  return json({
+    shop,
+    onboardingCompleted: existing?.completed ?? false,
+    adminEmail: existing?.adminEmail ?? "",
+    externalUrl: buildExternalUrl(shop, existing?.adminEmail ?? ""),
+  });
+};
 
-    // Server-side verification: if an email is present, ensure it exists in `Users` table
-    let normalizedEmail = null;
+export const action = async ({ request }) => {
+  const { session } = await authenticate.admin(request);
+  const shop = session.shop;
 
-    if (email) {
-      try {
-        normalizedEmail = (email || "").trim().toLowerCase();
-        const user = await prisma.users.findUnique({
-          where: {
-            email: normalizedEmail
-          }
-        });
-        
-        if (!user) {
-          console.log("/app action: email not found in Users table", { email: normalizedEmail });
-          return json(
-            {
-              ok: false,
-              error: "email_not_registered",
-              message: "This email is not registered with Dista-WMS. Please register at https://dista-sync-client.onrender.com/",
-            },
-            { status: 400 },
-          );
-        }
-      } catch (e) {
-        console.error("/app action: email verification failed", e);
-        return json({ ok: false, error: "email_verification_failed" }, { status: 500 });
-      }
-    }
+  let payload;
+  try {
+    payload = await request.json();
+  } catch (e) {
+    return json({ error: "Invalid request body" }, { status: 400 });
+  }
 
-    // Append store only after the onboarding is marked completed (step 2)
-    if (completed && shop && normalizedEmail) {
-      const user = await prisma.users.findUnique({ where: { email: normalizedEmail } });
-      if (user) {
-        let storesArray = [];
-        try {
-          storesArray = JSON.parse(user.stores || "[]");
-        } catch (e) {
-          console.error("/app action: failed to parse stores", e);
-          storesArray = [];
-        }
+  const email = (payload.email || "").trim().toLowerCase();
+  const completed = Boolean(payload.completed);
 
-        if (!storesArray.includes(shop)) {
-          storesArray.push(shop);
-          await prisma.users.update({
-            where: { email: normalizedEmail },
-            data: {
-              stores: JSON.stringify(storesArray),
-            },
-          });
-          console.log("/app action: added shop to user's stores", { email: normalizedEmail, shop });
-        }
-      }
-    }
+  if (!email) {
+    return json({ error: "Email is required" }, { status: 400 });
+  }
 
-    if (shop) {
-      const existing = await prisma.onboarding.findFirst({ where: { shop } });
-      if (existing) {
-        const updated = await prisma.onboarding.update({
-          where: { id: existing.id },
-          data: { completed: !!completed, adminEmail: email || existing.adminEmail, shop },
-        });
-        return json({ ok: true, record: updated });
-      }
-      const created = await prisma.onboarding.create({ data: { adminEmail: email || "", completed: !!completed, shop } });
-      return json({ ok: true, record: created });
-    }
+  const existing = await prisma.onboarding.findFirst({ where: { shop } });
 
-    const existing = await prisma.onboarding.findFirst({ where: { adminEmail: email } });
-    if (existing) {
-      const updated = await prisma.onboarding.update({
-        where: { id: existing.id },
-        data: { completed: !!completed, adminEmail: email },
-      });
-      return json({ ok: true, record: updated });
-    }
-    const created = await prisma.onboarding.create({
-      data: { adminEmail: email || "", completed: !!completed },
+  if (existing) {
+    await prisma.onboarding.update({
+      where: { id: existing.id },
+      data: { adminEmail: email, completed },
     });
-    return json({ ok: true, record: created });
-  } catch (e) {
-    console.error(e);
-    return json({ ok: false, error: "db_error" }, { status: 500 });
+  } else {
+    await prisma.onboarding.create({
+      data: { shop, adminEmail: email, completed },
+    });
   }
-}
 
-export async function loader({ request }) {
-  try {
-    const { session } = await shopify.authenticate.admin(request);
-    const { shop } = session; 
-    if (shop) {
-      const rec = await prisma.onboarding.findFirst({ where: { shop } });
-      const partnerEmails = await getPartnerEmails();
-      return json({ completed: !!(rec && rec.completed), record: rec || null, shop, partnerEmails });
-    }
-    const rec = await prisma.onboarding.findFirst({ where: { completed: true } });
-    const partnerEmails = await getPartnerEmails();
-    return json({ completed: !!rec, record: rec || null, shop: null, partnerEmails });
-  } catch (e) {
-    console.error("/app loader error", e);
-    return json({ completed: false, record: null, shop: null });
-  }
-}
+  return json({ ok: true, completed });
+};
 
 export default function Index() {
-  const data = useLoaderData();
-  const completed = !!data?.completed;
+  const {
+    onboardingCompleted: onboardingCompletedFromLoader,
+    adminEmail,
+    shop,
+    externalUrl,
+  } = useLoaderData();
 
-  if (completed) {
-    // Render homepage for onboarded stores
+  const [onboardingCompleted, setOnboardingCompleted] = useState(onboardingCompletedFromLoader);
+
+  if (!onboardingCompleted) {
     return (
-      <Page>
-        <TitleBar title="Dista Sync App" />
-        <div style={{ position: 'relative', width: '100%', maxWidth: 800, margin: '40px auto 0 auto' }}>
-          <Card padding="800" background="bg-surface" borderRadius="400">
-            <BlockStack gap="400" align="center">
-              <InlineStack gap="200" align="center" blockAlign="center">
-                <img
-                  src="/dista_logoo.png"
-                  alt="Dista Logo"
-                  width="90"
-                  height="90"
-                  loading="eager"
-                  style={{ display: 'block' }}
-                />
-                <Text as="h1" variant="heading2xl" fontWeight="bold" alignment="center">
-                  Dista Sync App
-                </Text>
-              </InlineStack>
-              <Text variant="bodyLg" as="p" tone="subdued" alignment="center">
-                This app is required for safe and secure collaboration with the Distacart organisation.
-                <br />
-                Please do not uninstall this app.
-              </Text>
-            </BlockStack>
-          </Card>
-          <div style={{ width: '100%', maxWidth: 800, margin: '0 auto', textAlign: 'right' }}>
-            <Text variant="bodySm" tone="subdued" as="p">
-              Powered by Distacart
-            </Text>
-          </div>
-        </div>
-      </Page>
+      <OnboardingWizard
+        initialEmail={adminEmail}
+        shop={shop}
+        finalUrl={externalUrl}
+        onCompleted={() => setOnboardingCompleted(true)}
+      />
     );
   }
 
   return (
-    <Page>
-      <TitleBar title="Dista Sync App" />
-      <OnboardingWizard initialEmail={data?.record?.adminEmail ?? ""} shop={data?.shop ?? null} partnerEmails={data?.partnerEmails ?? []} />
-    </Page>
+    <div style={{ height: "100vh", width: "100%", margin: 0, padding: 0 }}>
+      <ExternalSiteFrame url={externalUrl} />
+    </div>
   );
 }
