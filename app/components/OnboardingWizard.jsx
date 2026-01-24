@@ -92,7 +92,7 @@ export default function OnboardingWizard({ initialEmail = "", shop = null, final
 
           <BlockStack gap="200">
             <Text variant="bodyMd" as="p" color="subdued">
-              Please provide the email address which is registered to Dista-WMS.
+              Please provide your email address.
             </Text>
             <TextField
               value={email}
