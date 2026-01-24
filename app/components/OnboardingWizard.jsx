@@ -52,7 +52,7 @@ export default function OnboardingWizard({ initialEmail = "", shop = null, final
         }
         setShowWebsite(true);
         if (typeof onCompleted === "function") {
-          onCompleted();
+          onCompleted(normalizeEmail(email));
         }
       } catch (e) {
         console.error("handleNextFromEmail: fetch error", e);
@@ -104,9 +104,9 @@ export default function OnboardingWizard({ initialEmail = "", shop = null, final
               error={emailError || undefined}
               label="Email"
             />
-            <Text as="p" variant="bodySm" color="subdued">
+            {/* <Text as="p" variant="bodySm" color="subdued">
               If your email is not registered with Dista-WMS, please register <a href="https://dista-sync-client.onrender.com/" target="_blank" rel="noreferrer noopener">here</a>.
-            </Text>
+            </Text> */}
             <InlineStack gap="200" style={{ width: '100%', justifyContent: 'flex-end' }}>
               <Button primary onClick={handleNextFromEmail} loading={loading}>
                 Next

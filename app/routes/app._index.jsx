@@ -68,6 +68,19 @@ export const action = async ({ request }) => {
   return json({ ok: true, completed });
 };
 
+// Client-side function to update email in URL
+const updateEmailInUrl = (baseUrl, newEmail) => {
+  try {
+    const url = new URL(baseUrl);
+    if (newEmail) {
+      url.searchParams.set("email", newEmail);
+    }
+    return url.toString();
+  } catch (e) {
+    return baseUrl;
+  }
+};
+
 export default function Index() {
   const {
     onboardingCompleted: onboardingCompletedFromLoader,
@@ -77,6 +90,7 @@ export default function Index() {
   } = useLoaderData();
 
   const [onboardingCompleted, setOnboardingCompleted] = useState(onboardingCompletedFromLoader);
+  const [currentEmail, setCurrentEmail] = useState(adminEmail);
 
   if (!onboardingCompleted) {
     return (
@@ -84,14 +98,20 @@ export default function Index() {
         initialEmail={adminEmail}
         shop={shop}
         finalUrl={externalUrl}
-        onCompleted={() => setOnboardingCompleted(true)}
+        onCompleted={(updatedEmail) => {
+          setOnboardingCompleted(true);
+          setCurrentEmail(updatedEmail);
+        }}
       />
     );
   }
 
+  // Update URL with the current email (updated after onboarding)
+  const finalExternalUrl = updateEmailInUrl(externalUrl, currentEmail);
+
   return (
     <div style={{ height: "100vh", width: "100%", margin: 0, padding: 0 }}>
-      <ExternalSiteFrame url={externalUrl} />
+      <ExternalSiteFrame url={finalExternalUrl} />
     </div>
   );
 }
