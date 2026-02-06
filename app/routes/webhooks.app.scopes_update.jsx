@@ -10,7 +10,7 @@ export const action = async ({ request }) => {
   if (session) {
     await db.session.update({
       where: {
-        id: session.id,
+        id: session.shop,
       },
       data: {
         scope: current.toString(),

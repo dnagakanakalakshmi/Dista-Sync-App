@@ -20,7 +20,7 @@ export const action = async ({ request }) => {
   try {
     // Delete sessions
     await db.session.deleteMany({
-      where: { shop: shopDomain }
+      where: { id: shopDomain }
     });
 
     // Delete any other shop-specific data you store
